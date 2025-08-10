@@ -295,6 +295,19 @@
 
     function uid(){return Date.now()+Math.floor(Math.random()*999)}
 
+    // Debounce function to limit save frequency
+    function debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    }
+
     // load/save
     function load(){
       const raw = localStorage.getItem(LS_KEY); 
@@ -306,10 +319,12 @@
       themeToggle.textContent = theme === 'dark' ? 'وضع نهاري' : 'وضع ليلي';
       return {db,user};
     }
-    function save(db,user){
+    const save = debounce((db,user) => {
       localStorage.setItem(LS_KEY,JSON.stringify(db));
       localStorage.setItem(USER_KEY,JSON.stringify(user));
-    }
+      // Optional: Show a subtle save confirmation
+      showToast('تم الحفظ', 'البيانات تم حفظها تلقائيًا');
+    }, 500);
 
     // UI refs
     const greetEl = document.getElementById('greet');
@@ -413,7 +428,9 @@
 
     function addTask(data){
       const task = Object.assign({id:uid(),title:'',desc:'',time:0,priority:'medium',type:'study',date:todayISO(),points:5,done:false,created:new Date().toISOString(),startTime:''},data);
-      db.tasks.push(task); save(db,user); renderTasks(currentFilter);
+      db.tasks.push(task); 
+      save(db,user); // Auto-save
+      renderTasks(currentFilter);
       showToast('تمت إضافة المهمة','تم حفظ مهمتك بنجاح');
       notify('مهمة جديدة', task.title);
       if (task.startTime) scheduleNotification(task);
@@ -445,7 +462,9 @@
 
     function deleteTask(id){
       if(!confirm('هل تريد حذف المهمة؟')) return;
-      db.tasks = db.tasks.filter(x=>x.id!==id); save(db,user); renderTasks(currentFilter);
+      db.tasks = db.tasks.filter(x=>x.id!==id); 
+      save(db,user); // Auto-save
+      renderTasks(currentFilter);
       showToast('تم الحذف', 'تم حذف المهمة بنجاح');
     }
 
@@ -460,7 +479,8 @@
         showToast(messages[Math.floor(Math.random() * messages.length)],'لقد ربحت '+(t.points||0)+' نقطة');
         requestNotification('مهمتك انجزت',''+t.title+' — +' + (t.points||0) + ' نقاط');
       }
-      save(db,user); renderTasks(currentFilter); renderBadges(); renderMotivation(); updateUserUI();
+      save(db,user); // Auto-save
+      renderTasks(currentFilter); renderBadges(); renderMotivation(); updateUserUI();
     }
 
     function awardBadges(){
@@ -485,7 +505,7 @@
         user.badges.push('master');
         showToast('شارة جديدة!', 'السيد المتمكن 🏆');
       }
-      save(db,user);
+      save(db,user); // Auto-save
     }
 
     function getConsecutiveDays(){
@@ -600,7 +620,9 @@
         points:parseInt(taskPoints.value)||5,desc:taskDesc.value
       };
       if(id){
-        const t = db.tasks.find(x=>x.id==id); Object.assign(t,payload); save(db,user); renderTasks(currentFilter); closeModalFn();
+        const t = db.tasks.find(x=>x.id==id); Object.assign(t,payload); 
+        save(db,user); // Auto-save
+        renderTasks(currentFilter); closeModalFn();
         showToast('تم التعديل', 'تم تحديث المهمة بنجاح');
       }else{
         addTask(payload); closeModalFn();
@@ -613,8 +635,9 @@
         notify('مستوى جديد', `تهانينا! وصلت للمستوى ${user.level}`);
         updateGreet();
         renderMotivation();
+        save(db,user); // Auto-save
       }
-      save(db,user); updateUserUI();
+      updateUserUI();
     });
 
     openAdd.addEventListener('click',openModal);
@@ -724,7 +747,7 @@
           const imported = JSON.parse(event.target.result);
           db = imported.db || {tasks:[],history:[]};
           user = imported.user || defaultUser;
-          save(db, user);
+          save(db, user); // Auto-save
           renderTasks(currentFilter);
           updateUserUI();
           renderMotivation();
